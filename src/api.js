@@ -322,20 +322,13 @@ export const commentsAPI = {
   },
 
   update: (commentData) => {
-    const formData = new FormData();
-    formData.append('action', 'update');
-    Object.keys(commentData).forEach(key => {
-      if (commentData[key] !== null && commentData[key] !== undefined) {
-        formData.append(key, commentData[key]);
-      }
-    });
-
     return fetch(`${API_BASE_URL}/admin/comments/manage.php`, {
-      method: 'POST',
+      method: 'PUT',
       headers: {
+        'Content-Type': 'application/json',
         'Authorization': localStorage.getItem('auth_token') ? `Bearer ${localStorage.getItem('auth_token')}` : undefined
       },
-      body: formData
+      body: JSON.stringify(commentData)
     }).then(response => {
       if (!response.ok) {
         return response.json().then(errorData => {
@@ -537,7 +530,24 @@ export const publicAPI = {
       });
     }
     return response.json();
-  })
+  }),
+
+  createComment: (postId, commentData) => {
+    return fetch(`${API_BASE_URL}/public.php/public/posts/${postId}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(commentData)
+    }).then(response => {
+      if (!response.ok) {
+        return response.json().then(errorData => {
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        });
+      }
+      return response.json();
+    });
+  }
 };
 
 export default {

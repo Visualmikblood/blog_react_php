@@ -1,7 +1,7 @@
 <?php
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: GET, OPTIONS");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
 include_once 'config/database.php';
@@ -20,6 +20,9 @@ try {
     switch ($method) {
         case 'GET':
             handlePublicGet($db);
+            break;
+        case 'POST':
+            handlePublicPost($db);
             break;
         default:
             http_response_code(405);
@@ -45,6 +48,20 @@ function handlePublicGet($db) {
     // Obtener categorías
     elseif (strpos($request_uri, '/public/categories') !== false) {
         getCategories($db);
+    }
+    else {
+        http_response_code(404);
+        echo json_encode(array("message" => "Endpoint no encontrado."));
+    }
+}
+
+function handlePublicPost($db) {
+    $request_uri = $_SERVER['REQUEST_URI'];
+
+    // Crear comentario en un artículo
+    if (preg_match('/\/public\/posts\/(\d+)\/comments/', $request_uri, $matches)) {
+        $postId = $matches[1];
+        createComment($db, $postId);
     }
     else {
         http_response_code(404);
@@ -225,5 +242,83 @@ function getCategories($db) {
 
     http_response_code(200);
     echo json_encode(["categories" => $categories]);
+}
+
+function createComment($db, $postId) {
+    // Verificar que el artículo existe y está publicado
+    $postQuery = "SELECT id FROM posts WHERE id = :id AND status = 'published'";
+    $postStmt = $db->prepare($postQuery);
+    $postStmt->bindParam(':id', $postId, PDO::PARAM_INT);
+    $postStmt->execute();
+
+    if (!$postStmt->fetch()) {
+        http_response_code(404);
+        echo json_encode(array("message" => "Artículo no encontrado."));
+        return;
+    }
+
+    // Obtener datos del comentario
+    $data = json_decode(file_get_contents("php://input"), true);
+
+    if (!$data) {
+        http_response_code(400);
+        echo json_encode(array("message" => "Datos del comentario requeridos."));
+        return;
+    }
+
+    $author_name = isset($data['author_name']) ? trim($data['author_name']) : null;
+    $author_email = isset($data['author_email']) ? trim($data['author_email']) : null;
+    $content = isset($data['content']) ? trim($data['content']) : null;
+
+    // Validar datos requeridos
+    if (!$author_name || !$author_email || !$content) {
+        http_response_code(400);
+        echo json_encode(array("message" => "Nombre, email y contenido del comentario son requeridos."));
+        return;
+    }
+
+    // Validar formato de email
+    if (!filter_var($author_email, FILTER_VALIDATE_EMAIL)) {
+        http_response_code(400);
+        echo json_encode(array("message" => "Formato de email inválido."));
+        return;
+    }
+
+    // Validar longitud del contenido
+    if (strlen($content) < 10 || strlen($content) > 1000) {
+        http_response_code(400);
+        echo json_encode(array("message" => "El comentario debe tener entre 10 y 1000 caracteres."));
+        return;
+    }
+
+    // Insertar comentario
+    $query = "INSERT INTO comments (post_id, author_name, author_email, content, status, created_at, updated_at)
+              VALUES (:post_id, :author_name, :author_email, :content, 'pending', NOW(), NOW())";
+
+    $stmt = $db->prepare($query);
+    $stmt->bindParam(':post_id', $postId, PDO::PARAM_INT);
+    $stmt->bindParam(':author_name', $author_name);
+    $stmt->bindParam(':author_email', $author_email);
+    $stmt->bindParam(':content', $content);
+
+    if ($stmt->execute()) {
+        $commentId = $db->lastInsertId();
+
+        http_response_code(201);
+        echo json_encode([
+            "message" => "Comentario enviado exitosamente. Está pendiente de aprobación.",
+            "comment" => [
+                "id" => $commentId,
+                "author_name" => $author_name,
+                "author_email" => $author_email,
+                "content" => $content,
+                "status" => "pending",
+                "date" => date('Y-m-d H:i')
+            ]
+        ]);
+    } else {
+        http_response_code(500);
+        echo json_encode(array("message" => "Error al crear el comentario."));
+    }
 }
 ?>

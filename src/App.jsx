@@ -1,14 +1,56 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react';
 import {
   Plus, Edit3, Save, X, Eye, Image, Bold, Italic, Link, List,
   Hash, Quote, Code, Upload, Calendar, User, Tag, Folder,
   Settings, Trash2, Search, Filter, MoreVertical, Check,
   AlertCircle, FileText, BarChart3, Users, MessageSquare, LogIn, LogOut,
-  Home, BookOpen, Clock, ArrowLeft
+  Home, BookOpen, Clock, ArrowLeft, Moon, Sun
 } from 'lucide-react';
 import { authAPI, postsAPI, categoriesAPI, dashboardAPI, uploadAPI, commentsAPI, usersAPI, settingsAPI, publicAPI } from './api';
 
+// Contexto del tema
+const ThemeContext = createContext();
+
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};
+
+const ThemeProvider = ({ children }) => {
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    // Cargar preferencia del localStorage
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  useEffect(() => {
+    // Guardar preferencia en localStorage
+    localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
+
+    // Aplicar clase al elemento raíz
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  const toggleTheme = () => {
+    setIsDarkMode(prev => !prev);
+  };
+
+  return (
+    <ThemeContext.Provider value={{ isDarkMode, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
+
 const AdminPanel = () => {
+  const { isDarkMode, toggleTheme } = useTheme();
   const [currentView, setCurrentView] = useState('welcome');
   const [isPublicView, setIsPublicView] = useState(false);
   const [posts, setPosts] = useState([]);
@@ -2081,8 +2123,8 @@ const AdminPanel = () => {
     ];
 
     return (
-      <div className="w-64 bg-white shadow-lg h-full">
-        <div className="p-6 border-b border-gray-200">
+      <div className="w-64 bg-white dark:bg-gray-800 shadow-lg h-full">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Panel Admin
           </h1>
@@ -2092,8 +2134,10 @@ const AdminPanel = () => {
             <button
               key={item.id}
               onClick={() => setCurrentView(item.id)}
-              className={`w-full flex items-center px-6 py-3 text-left hover:bg-gray-50 transition-colors ${
-                currentView === item.id ? 'bg-blue-50 text-blue-600 border-r-2 border-blue-600' : 'text-gray-600'
+              className={`w-full flex items-center px-6 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                currentView === item.id
+                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-r-2 border-blue-600'
+                  : 'text-gray-600 dark:text-gray-300'
               }`}
             >
               <item.icon className="w-5 h-5 mr-3" />
@@ -2102,10 +2146,10 @@ const AdminPanel = () => {
           ))}
 
           {/* Enlace al blog público */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
+          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={() => setIsPublicView(true)}
-              className="w-full flex items-center px-6 py-3 text-left hover:bg-gray-50 transition-colors text-gray-600"
+              className="w-full flex items-center px-6 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300"
             >
               <BookOpen className="w-5 h-5 mr-3" />
               Ver Blog Público
@@ -2193,11 +2237,100 @@ const AdminPanel = () => {
       setPublicFilters(prev => ({ ...prev, page: 1 }));
     };
 
+    // Componente para el formulario de comentarios
+    const CommentForm = ({ postId, onCommentAdded }) => {
+      const [commentData, setCommentData] = useState({
+        author_name: '',
+        author_email: '',
+        content: ''
+      });
+      const [isSubmitting, setIsSubmitting] = useState(false);
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+
+        try {
+          await publicAPI.createComment(postId, commentData);
+          showNotification('Comentario enviado exitosamente. Está pendiente de aprobación.');
+          setCommentData({ author_name: '', author_email: '', content: '' });
+          if (onCommentAdded) {
+            onCommentAdded();
+          }
+        } catch (error) {
+          console.error('Error creating comment:', error);
+          showNotification('Error al enviar el comentario: ' + error.message, 'error');
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nombre *
+              </label>
+              <input
+                type="text"
+                value={commentData.author_name}
+                onChange={(e) => setCommentData(prev => ({ ...prev, author_name: e.target.value }))}
+                placeholder="Tu nombre"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email *
+              </label>
+              <input
+                type="email"
+                value={commentData.author_email}
+                onChange={(e) => setCommentData(prev => ({ ...prev, author_email: e.target.value }))}
+                placeholder="tu@email.com"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Comentario *
+            </label>
+            <textarea
+              value={commentData.content}
+              onChange={(e) => setCommentData(prev => ({ ...prev, content: e.target.value }))}
+              placeholder="Escribe tu comentario aquí..."
+              rows="4"
+              maxLength="1000"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              required
+            />
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-right">
+              {commentData.content.length}/1000 caracteres
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all duration-300 flex items-center gap-2 disabled:opacity-50 dark:from-blue-600 dark:to-purple-700"
+            >
+              <MessageSquare className="w-4 h-4" />
+              {isSubmitting ? 'Enviando...' : 'Enviar Comentario'}
+            </button>
+          </div>
+        </form>
+      );
+    };
+
     if (currentPost) {
       // Vista de artículo individual
       return (
-        <div className="min-h-screen bg-gray-50">
-          <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+          <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
             <div className="max-w-4xl mx-auto px-6 py-4">
               <button
                 onClick={backToBlog}
@@ -2292,6 +2425,12 @@ const AdminPanel = () => {
                 </div>
               </div>
             )}
+
+            {/* Formulario para agregar comentario */}
+            <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+              <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Deja tu comentario</h3>
+              <CommentForm postId={currentPost.id} onCommentAdded={() => loadPostById(currentPost.id)} />
+            </div>
           </main>
         </div>
       );
@@ -2299,22 +2438,22 @@ const AdminPanel = () => {
 
     // Vista de lista de artículos
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm border-b border-gray-200">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
           <div className="max-w-6xl mx-auto px-6 py-6">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                   ModernBlog
                 </h1>
-                <p className="text-gray-600 mt-1">Descubre artículos interesantes sobre tecnología y desarrollo</p>
+                <p className="text-gray-600 dark:text-gray-300 mt-1">Descubre artículos interesantes sobre tecnología y desarrollo</p>
               </div>
               <button
                 onClick={() => {
                   setIsPublicView(false);
                   setCurrentView('login');
                 }}
-                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all duration-300"
+                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all duration-300 dark:from-blue-600 dark:to-purple-700"
               >
                 Panel Admin
               </button>
@@ -2328,13 +2467,13 @@ const AdminPanel = () => {
                   placeholder="Buscar artículos..."
                   value={publicFilters.search}
                   onChange={(e) => handlePublicFilterChange('search', e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
               </div>
               <select
                 value={publicFilters.category}
                 onChange={(e) => handlePublicFilterChange('category', e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="">Todas las categorías</option>
                 {publicCategories.map(cat => (
@@ -2362,7 +2501,7 @@ const AdminPanel = () => {
               {publicPosts.map(post => (
                 <article
                   key={post.id}
-                  className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 cursor-pointer flex flex-col"
+                  className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 cursor-pointer flex flex-col"
                   onClick={() => viewPost(post.id)}
                 >
                   {post.featured_image && (
@@ -2384,15 +2523,15 @@ const AdminPanel = () => {
                       </span>
                     </div>
 
-                    <h2 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-3 line-clamp-2">
                       {post.title}
                     </h2>
 
-                    <p className="text-gray-600 mb-4 line-clamp-3">
+                    <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-3">
                       {post.excerpt}
                     </p>
 
-                    <div className="flex items-center justify-between text-sm text-gray-500">
+                    <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
                       <span className="flex items-center gap-1">
                         <User className="w-4 h-4" />
                         {post.author}
@@ -2406,7 +2545,7 @@ const AdminPanel = () => {
                         {post.comments_count}
                       </span>
                       <span
-                        className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium cursor-pointer"
                         onClick={() => viewPost(post.id)}
                       >
                         Leer más →
@@ -2464,14 +2603,14 @@ const AdminPanel = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       <Sidebar />
 
       <div className="flex-1 overflow-hidden">
-        <header className="bg-white shadow-sm border-b border-gray-200">
+        <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">
+              <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
                 {currentView === 'dashboard' && 'Dashboard'}
                 {currentView === 'posts' && 'Artículos'}
                 {currentView === 'editor' && (editorPost.id ? 'Editar Artículo' : 'Nuevo Artículo')}
@@ -2483,20 +2622,32 @@ const AdminPanel = () => {
             </div>
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
                 <input
                   type="text"
                   placeholder="Buscar..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 w-64"
+                  className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-64"
                 />
               </div>
+              {/* Botón del tema */}
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                title={isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              >
+                {isDarkMode ? (
+                  <Sun className="w-5 h-5 text-yellow-500" />
+                ) : (
+                  <Moon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                )}
+              </button>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                   <User className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-700">{user?.name || 'Admin User'}</p>
-                  <p className="text-xs text-gray-500">{user?.email || 'admin@blog.com'}</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{user?.name || 'Admin User'}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email || 'admin@blog.com'}</p>
                 </div>
                 <button
                   onClick={handleLogout}
@@ -2510,7 +2661,7 @@ const AdminPanel = () => {
           </div>
         </header>
 
-        <main className="p-6 overflow-y-auto h-full">
+        <main className="p-6 overflow-y-auto h-full bg-gray-50 dark:bg-gray-900">
           {currentView === 'dashboard' && <Dashboard />}
           {currentView === 'posts' && <PostsList />}
           {currentView === 'editor' && <ArticleEditor />}
@@ -2531,4 +2682,12 @@ const AdminPanel = () => {
   );
 };
 
-export default AdminPanel;
+const App = () => {
+  return (
+    <ThemeProvider>
+      <AdminPanel />
+    </ThemeProvider>
+  );
+};
+
+export default App;
