@@ -51,13 +51,22 @@ try {
             handleGetCategories($db);
             break;
         case 'POST':
-            handleCreateCategory($db);
-            break;
-        case 'PUT':
-            handleUpdateCategory($db);
-            break;
-        case 'DELETE':
-            handleDeleteCategory($db);
+            // Determinar la acción basada en el campo 'action' del FormData
+            $action = isset($_POST['action']) ? $_POST['action'] : null;
+            switch ($action) {
+                case 'create':
+                    handleCreateCategory($db);
+                    break;
+                case 'update':
+                    handleUpdateCategory($db);
+                    break;
+                case 'delete':
+                    handleDeleteCategory($db);
+                    break;
+                default:
+                    http_response_code(400);
+                    echo json_encode(array("message" => "Acción no válida."));
+            }
             break;
         default:
             http_response_code(405);
@@ -97,18 +106,17 @@ function handleGetCategories($db) {
 }
 
 function handleCreateCategory($db) {
-    $data = json_decode(file_get_contents("php://input"));
+    $name = isset($_POST['name']) ? Helpers::sanitizeInput($_POST['name']) : null;
 
-    if (!isset($data->name)) {
+    if (!$name) {
         http_response_code(400);
         echo json_encode(array("message" => "Nombre de categoría requerido."));
         return;
     }
 
-    $name = Helpers::sanitizeInput($data->name);
     $slug = Helpers::generateSlug($name);
-    $description = isset($data->description) ? Helpers::sanitizeInput($data->description) : null;
-    $icon = isset($data->icon) ? Helpers::sanitizeInput($data->icon) : null;
+    $description = isset($_POST['description']) ? Helpers::sanitizeInput($_POST['description']) : null;
+    $icon = isset($_POST['icon']) ? Helpers::sanitizeInput($_POST['icon']) : null;
 
     // Verificar que el slug no existe
     $check_query = "SELECT id FROM categories WHERE slug = :slug";
@@ -142,19 +150,18 @@ function handleCreateCategory($db) {
 }
 
 function handleUpdateCategory($db) {
-    $data = json_decode(file_get_contents("php://input"));
+    $id = isset($_POST['id']) ? $_POST['id'] : null;
+    $name = isset($_POST['name']) ? Helpers::sanitizeInput($_POST['name']) : null;
 
-    if (!isset($data->id) || !isset($data->name)) {
+    if (!$id || !$name) {
         http_response_code(400);
         echo json_encode(array("message" => "ID y nombre de categoría requeridos."));
         return;
     }
 
-    $id = $data->id;
-    $name = Helpers::sanitizeInput($data->name);
     $slug = Helpers::generateSlug($name);
-    $description = isset($data->description) ? Helpers::sanitizeInput($data->description) : null;
-    $icon = isset($data->icon) ? Helpers::sanitizeInput($data->icon) : null;
+    $description = isset($_POST['description']) ? Helpers::sanitizeInput($_POST['description']) : null;
+    $icon = isset($_POST['icon']) ? Helpers::sanitizeInput($_POST['icon']) : null;
 
     // Verificar que la categoría existe
     $check_query = "SELECT id FROM categories WHERE id = :id";
@@ -199,7 +206,7 @@ function handleUpdateCategory($db) {
 }
 
 function handleDeleteCategory($db) {
-    $category_id = isset($_GET['id']) ? $_GET['id'] : null;
+    $category_id = isset($_POST['id']) ? $_POST['id'] : null;
 
     if (!$category_id) {
         http_response_code(400);

@@ -2362,7 +2362,7 @@ const AdminPanel = () => {
               {publicPosts.map(post => (
                 <article
                   key={post.id}
-                  className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 cursor-pointer"
+                  className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 cursor-pointer flex flex-col"
                   onClick={() => viewPost(post.id)}
                 >
                   {post.featured_image && (
@@ -2373,7 +2373,7 @@ const AdminPanel = () => {
                     />
                   )}
 
-                  <div className="p-6">
+                  <div className="p-6 flex-1 flex flex-col justify-end">
                     <div className="flex items-center gap-2 mb-3">
                       <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
                         {post.category}
