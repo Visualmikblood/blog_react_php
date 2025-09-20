@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Login - Blog React PHP</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .login-form {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(45deg, #4f46e5, #7c3aed);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .credentials {
+            background-color: #e2e3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-form">
+        <h2>🔐 Test de Login - Blog React PHP</h2>
+        
+        <div class="credentials">
+            <strong>Credenciales correctas:</strong><br>
+            📧 Email: admin@blog.com<br>
+            🔑 Password: password
+        </div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" value="admin@blog.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Contraseña:</label>
+                <input type="password" id="password" name="password" value="password" required>
+            </div>
+            
+            <button type="submit" id="loginBtn">🚀 Iniciar Sesión</button>
+        </form>
+        
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('result');
+            const loginBtn = document.getElementById('loginBtn');
+            
+            // Mostrar estado de carga
+            loginBtn.textContent = '⏳ Iniciando sesión...';
+            loginBtn.disabled = true;
+            resultDiv.style.display = 'none';
+            
+            try {
+                console.log('🔄 Enviando petición de login...');
+                console.log('📧 Email:', email);
+                console.log('🔑 Password:', password);
+                console.log('🌐 URL:', `${API_BASE_URL}/admin/auth/auth.php`);
+                
+                const response = await fetch(`${API_BASE_URL}/admin/auth/auth.php`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'login',
+                        email: email,
+                        password: password
+                    })
+                });
+                
+                console.log('📊 Status:', response.status);
+                console.log('📋 Headers:', [...response.headers.entries()]);
+                
+                const data = await response.json();
+                console.log('📦 Respuesta:', data);
+                
+                if (response.ok && data.token) {
+                    // Login exitoso
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <h3>✅ ¡Login Exitoso!</h3>
+                        <p><strong>Usuario:</strong> ${data.user.name}</p>
+                        <p><strong>Email:</strong> ${data.user.email}</p>
+                        <p><strong>Rol:</strong> ${data.user.role}</p>
+                        <p><strong>Token:</strong> ${data.token.substring(0, 50)}...</p>
+                        <p><strong>Mensaje:</strong> ${data.message}</p>
+                    `;
+                    
+                    // Guardar token en localStorage
+                    localStorage.setItem('auth_token', data.token);
+                    
+                } else {
+                    // Error en login
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+                        <h3>❌ Error en Login</h3>
+                        <p><strong>Status:</strong> ${response.status}</p>
+                        <p><strong>Mensaje:</strong> ${data.message || 'Error desconocido'}</p>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('💥 Error:', error);
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h3>💥 Error de Conexión</h3>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p>Verifica que el servidor PHP esté corriendo en localhost:8000</p>
+                `;
+            } finally {
+                // Restaurar botón
+                loginBtn.textContent = '🚀 Iniciar Sesión';
+                loginBtn.disabled = false;
+                resultDiv.style.display = 'block';
+            }
+        });
+        
+        // Verificar si hay token guardado
+        const savedToken = localStorage.getItem('auth_token');
+        if (savedToken) {
+            console.log('🎫 Token guardado encontrado:', savedToken.substring(0, 50) + '...');
+        }
+    </script>
+</body>
+</html>

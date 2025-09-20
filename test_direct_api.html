@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Direct API</title>
+</head>
+<body>
+    <h1>Test Direct API</h1>
+    <button onclick="testLogin()">Login</button>
+    <button onclick="testPosts()">Get Posts</button>
+    <button onclick="testCategories()">Get Categories</button>
+    <button onclick="testDashboard()">Get Dashboard</button>
+    <div id="results"></div>
+
+    <script>
+        let token = null;
+
+        async function testLogin() {
+            const formData = new FormData();
+            formData.append('action', 'login');
+            formData.append('email', 'admin@blog.com');
+            formData.append('password', 'password');
+
+            try {
+                const response = await fetch('http://localhost:8000/admin/auth/auth.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                console.log('Login result:', result);
+
+                if (result.token) {
+                    token = result.token;
+                    localStorage.setItem('auth_token', token);
+                    document.getElementById('results').innerHTML += '<p>✅ Login exitoso! Token guardado.</p>';
+                } else {
+                    document.getElementById('results').innerHTML += '<p>❌ Login falló</p>';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                document.getElementById('results').innerHTML += '<p>❌ Error en login: ' + error.message + '</p>';
+            }
+        }
+
+        async function testPosts() {
+            try {
+                const response = await fetch('http://localhost:8000/admin/posts/list.php', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': token ? `Bearer ${token}` : undefined
+                    }
+                });
+
+                console.log('Posts response status:', response.status);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Posts result:', result);
+                    document.getElementById('results').innerHTML += '<p>✅ Posts obtenidos: ' + (result.posts ? result.posts.length : 0) + ' artículos</p>';
+                } else {
+                    const errorText = await response.text();
+                    console.error('Posts error:', errorText);
+                    document.getElementById('results').innerHTML += '<p>❌ Error obteniendo posts: ' + response.status + '</p>';
+                }
+            } catch (error) {
+                console.error('Posts fetch error:', error);
+                document.getElementById('results').innerHTML += '<p>❌ Error en fetch posts: ' + error.message + '</p>';
+            }
+        }
+
+        async function testCategories() {
+            try {
+                const response = await fetch('http://localhost:8000/admin/categories/manage.php', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': token ? `Bearer ${token}` : undefined
+                    }
+                });
+
+                console.log('Categories response status:', response.status);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Categories result:', result);
+                    document.getElementById('results').innerHTML += '<p>✅ Categorías obtenidas: ' + (result.categories ? result.categories.length : 0) + ' categorías</p>';
+                } else {
+                    const errorText = await response.text();
+                    console.error('Categories error:', errorText);
+                    document.getElementById('results').innerHTML += '<p>❌ Error obteniendo categorías: ' + response.status + '</p>';
+                }
+            } catch (error) {
+                console.error('Categories fetch error:', error);
+                document.getElementById('results').innerHTML += '<p>❌ Error en fetch categorías: ' + error.message + '</p>';
+            }
+        }
+
+        async function testDashboard() {
+            try {
+                const response = await fetch('http://localhost:8000/admin/dashboard/stats.php', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': token ? `Bearer ${token}` : undefined
+                    }
+                });
+
+                console.log('Dashboard response status:', response.status);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Dashboard result:', result);
+                    document.getElementById('results').innerHTML += '<p>✅ Dashboard obtenido</p>';
+                } else {
+                    const errorText = await response.text();
+                    console.error('Dashboard error:', errorText);
+                    document.getElementById('results').innerHTML += '<p>❌ Error obteniendo dashboard: ' + response.status + '</p>';
+                }
+            } catch (error) {
+                console.error('Dashboard fetch error:', error);
+                document.getElementById('results').innerHTML += '<p>❌ Error en fetch dashboard: ' + error.message + '</p>';
+            }
+        }
+
+        // Cargar token si existe
+        window.onload = function() {
+            token = localStorage.getItem('auth_token');
+            if (token) {
+                document.getElementById('results').innerHTML += '<p>✅ Token encontrado en localStorage</p>';
+            } else {
+                document.getElementById('results').innerHTML += '<p>⚠️ No hay token en localStorage</p>';
+            }
+        };
+    </script>
+</body>
+</html>
